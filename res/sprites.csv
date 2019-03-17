@@ -1,7 +1,0 @@
-Sprite		Ancho	Alto	Color
-Alien		12		16		Verde
-Alien shot	3		3		Blanco
-Asteroide	8		14		Gris Claro
-Vidas		8		8		Rojo Claro
-Nave		14		16		Gris Claro
-			45		16
