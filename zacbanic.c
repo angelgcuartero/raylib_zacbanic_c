@@ -7,13 +7,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define FACTOR 4
+#define FACTOR 4    // Must be 1, 2 or 4.
 #define ASTER_NUM 8
 #define ALIEN_NUM 4
 
 // User-defined types.
 typedef enum GameScreen { TITLE=0, GAMEPLAY, ENDING } GameScreen;
-typedef enum Direction { UP = 0, DOWN } Direction;
+// typedef enum Direction { UP = 0, DOWN } Direction;
 
 // Global variables.
 Rectangle ship;
@@ -65,7 +65,7 @@ void InitializeElements(void)
 void LoadGameTextures(void)
 {
     char spriteFile[128];
-    sprintf(spriteFile, "./res/SpritesZacbanicx%1d.png", FACTOR);
+    sprintf(spriteFile, "SpritesZacbanicx%1d.png", FACTOR);
     sprites = LoadTexture(spriteFile);
 }
 
@@ -77,13 +77,13 @@ void InitShip(void)
 void InitAsteroids(void)
 {
     for (int i=0; i<ASTER_NUM; ++i)
-        asteroids[i] = (Rectangle) {GetRandomValue(0, screenWidth), GetRandomValue(0, screenHeight), 16*FACTOR, 16*FACTOR};
+        asteroids[i] = (Rectangle) {GetRandomValue(0, (int)screenWidth>>4)<<4, GetRandomValue(0, screenHeight), 16*FACTOR, 16*FACTOR};
 }
 
 void InitAliens(void)
 {
     for (int i=0; i<ALIEN_NUM; ++i)
-        aliens[i] = (Rectangle) {GetRandomValue(0, screenWidth), GetRandomValue(0, screenHeight), 16*FACTOR, 16*FACTOR};
+        aliens[i] = (Rectangle) {GetRandomValue(0, (int)screenWidth>>4)<<4, GetRandomValue(0, screenHeight), 16*FACTOR, 16*FACTOR};
 }
 
 void DrawShip(void)
@@ -110,7 +110,7 @@ void MoveAsteroids(void)
         asteroids[i].y += FACTOR;
         if (asteroids[i].y > screenHeight)
         {
-            asteroids[i].x = GetRandomValue(0, screenWidth);
+            asteroids[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
             asteroids[i].y = 0 - asteroidText.height;
         }
     }
@@ -120,10 +120,10 @@ void MoveAliens(void)
 {
     for (int i=0; i<ALIEN_NUM; ++i)
     {
-        aliens[i].y += FACTOR;
+        aliens[i].y += FACTOR*1.1;
         if (aliens[i].y > screenHeight)
         {
-            aliens[i].x = GetRandomValue(0, screenWidth);
+            aliens[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
             aliens[i].y = 0 - alienText.height;
         }
     }
@@ -189,17 +189,14 @@ int main(void)
             {
                 case TITLE:
                 {
-                    // TODO: Draw TITLE screen here!
-                    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), GREEN);
-                    // DrawRectangle(0, 0, screenWidth, screenHeight, GREEN);
-                    DrawText("ZACBANIC", 20, 20, 40*FACTOR, DARKGREEN);
-                    DrawText("PRESS ENTER to PLAY", 20, 80*FACTOR, 10*FACTOR, DARKGREEN);
-                    DrawText("PRESS ESC to QUIT", 20, 80*FACTOR + 10*FACTOR, 10*FACTOR, DARKGREEN);
-
+                    DrawText("ZACBANIC", 20, 20, 40*FACTOR, MAROON);
+                    DrawText("Programmed with Raylib by Angel G. Cuartero", 20, 50*FACTOR, 5*FACTOR, GRAY);
+                    DrawText("Player Keys: O, P, Space Bar", 20, 70*FACTOR, 10*FACTOR, GRAY);
+                    DrawText("PRESS ENTER to PLAY", 20, 90*FACTOR, 10*FACTOR, GRAY);
+                    DrawText("PRESS ESC to QUIT", 20, 100*FACTOR, 10*FACTOR, GRAY);
                 } break;
                 case GAMEPLAY:
                 {
-                    // TODO: Draw GAMEPLAY screen here!
                     DrawShip();
                     DrawAsteroids();
                     DrawAliens();
@@ -211,7 +208,6 @@ int main(void)
                     // DrawRectangle(0, 0, screenWidth, screenHeight, BLUE);
                     DrawText("ENDING SCREEN", 20, 20, 40, DARKBLUE);
                     DrawText("PRESS ENTER or TAP to RETURN to TITLE SCREEN", 120, 220, 20, DARKBLUE);
-
                 } break;
                 default: break;
             }
