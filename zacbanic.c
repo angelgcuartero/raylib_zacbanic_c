@@ -1,13 +1,14 @@
-/*******************************************************************************************
+/******************************************************************************
 *   Zacbanic
-*   Sord M5 computer came with a game in tape named Zacbanic. This a Zacbanic clone.
-********************************************************************************************/
+*   Sord M5 computer came with a game in tape named Zacbanic.
+*   This a Zacbanic clone.
+******************************************************************************/
 
 #include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-#define FACTOR 4    // Must be 1, 2 or 4.
+#define FACTOR 2    // Must be 1, 2 or 4.
 #define ASTER_NUM 8
 #define ALIEN_NUM 4
 
@@ -17,18 +18,21 @@ typedef enum GameScreen { TITLE=0, GAMEPLAY, ENDING } GameScreen;
 
 // Global variables.
 Rectangle ship;
+Rectangle shipShot;
+bool shipShotReady;
 Rectangle asteroids[ASTER_NUM];
 Rectangle aliens[ALIEN_NUM];
+Rectangle alienShot[ALIEN_NUM];
 
 Texture2D sprites;
 
 // Locate individual textures.
-Rectangle shipText = {0, 0, 14*FACTOR, 16*FACTOR};
-Rectangle alienText = {14*FACTOR, 0, 12*FACTOR, 16*FACTOR};
-Rectangle asteroidText = {(14+12)*FACTOR, 0, 8*FACTOR, 14*FACTOR};
-Rectangle livesText = {(14+12+8)*FACTOR, 0, 8*FACTOR, 8*FACTOR};
-Rectangle ashotText = {(14+12+8+8)*FACTOR, 0, 3*FACTOR, 3*FACTOR};
-Rectangle sshotText = {(14+12+8+8)*FACTOR, 3*FACTOR, 3*FACTOR, 10*FACTOR};
+Rectangle shipTex = {0, 0, 14*FACTOR, 16*FACTOR};
+Rectangle alienTex = {14*FACTOR, 0, 12*FACTOR, 16*FACTOR};
+Rectangle asteroidTex = {(14+12)*FACTOR, 0, 8*FACTOR, 14*FACTOR};
+Rectangle livesTex = {(14+12+8)*FACTOR, 0, 8*FACTOR, 8*FACTOR};
+Rectangle ashotTex = {(14+12+8+8)*FACTOR, 0, 3*FACTOR, 3*FACTOR};
+Rectangle sshotTex = {(14+12+8+8)*FACTOR, 3*FACTOR, 3*FACTOR, 10*FACTOR};
 
 GameScreen currentScreen = TITLE;
 int screenWidth = 256*FACTOR;
@@ -38,15 +42,11 @@ int screenHeight = 192*FACTOR;
 // Prototypes
 // ----------
 void InitializeElements(void);
-void LoadGameTextures(void);
-void InitShip(void);
-void InitAsteroids(void);
-void InitAliens(void);
-void DrawShip(void);
-void DrawAsteroids(void);
-void DrawAliens(void);
 void MoveAsteroids(void);
 void MoveAliens(void);
+void ShipShoot(void);
+void UpdateShipShoot(void);
+void AlienShoot(void);
 
 
 // Initialize window and primary game elements.
@@ -55,52 +55,47 @@ void InitializeElements(void)
 {
     InitWindow(screenWidth, screenHeight, "Zacbanic");
     // ToggleFullscreen();
-    LoadGameTextures();
-    InitShip();
-    InitAsteroids();
-    InitAliens();
-    SetTargetFPS(60);               // Set desired framerate (frames-per-second)
-}
 
-void LoadGameTextures(void)
-{
     char spriteFile[128];
     sprintf(spriteFile, "SpritesZacbanicx%1d.png", FACTOR);
     sprites = LoadTexture(spriteFile);
-}
 
-void InitShip(void)
-{
-    ship = (Rectangle) {screenWidth/2, screenHeight - shipText.height, shipText.width, shipText.height};
-}
+    // Init ship and shot.
+    ship = (Rectangle) {
+        screenWidth/2 - shipTex.width/2,
+        screenHeight - shipTex.height - 16*FACTOR,
+        shipTex.width,
+        shipTex.height
+    };
 
-void InitAsteroids(void)
-{
+    shipShot = (Rectangle) {
+        screenWidth,
+        screenHeight,
+        sshotTex.width,
+        sshotTex.height
+    };
+
+    shipShotReady = true;
+
+    // Initialize asteroids' positions.
     for (int i=0; i<ASTER_NUM; ++i)
-        asteroids[i] = (Rectangle) {GetRandomValue(0, (int)screenWidth>>4)<<4, GetRandomValue(0, screenHeight), 16*FACTOR, 16*FACTOR};
-}
+        asteroids[i] = (Rectangle) {
+            GetRandomValue(0, (int)screenWidth>>4)<<4,
+            GetRandomValue(0, screenHeight),
+            asteroidTex.width,
+            asteroidTex.height
+        };
 
-void InitAliens(void)
-{
+    // Initialize aliens' positions.
     for (int i=0; i<ALIEN_NUM; ++i)
-        aliens[i] = (Rectangle) {GetRandomValue(0, (int)screenWidth>>4)<<4, GetRandomValue(0, screenHeight), 16*FACTOR, 16*FACTOR};
-}
+        aliens[i] = (Rectangle) {
+            GetRandomValue(0, (int)screenWidth>>4)<<4,
+            GetRandomValue(0, screenHeight),
+            alienTex.width,
+            alienTex.height
+        };
 
-void DrawShip(void)
-{
-    DrawTextureRec(sprites, shipText, (Vector2) {ship.x, ship.y}, WHITE);
-}
-
-void DrawAsteroids(void)
-{
-    for (int i=0; i<ASTER_NUM; ++i)
-        DrawTextureRec(sprites, asteroidText, (Vector2) {asteroids[i].x, asteroids[i].y}, WHITE);
-}
-
-void DrawAliens(void)
-{
-    for (int i=0; i<ALIEN_NUM; ++i)
-        DrawTextureRec(sprites, alienText, (Vector2) {aliens[i].x, aliens[i].y}, WHITE);
+    SetTargetFPS(60);  // Set desired framerate (frames-per-second)
 }
 
 void MoveAsteroids(void)
@@ -111,8 +106,21 @@ void MoveAsteroids(void)
         if (asteroids[i].y > screenHeight)
         {
             asteroids[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
-            asteroids[i].y = 0 - asteroidText.height;
+            asteroids[i].y = -asteroids[i].height;
+            continue;
         }
+
+       if (CheckCollisionRecs(asteroids[i], shipShot))
+       {
+            asteroids[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
+            asteroids[i].y = -asteroids[i].height;
+            if (!shipShotReady)
+            {
+                // Hide sprite and get it available for shooting again.
+                shipShot.x = shipShot.y = screenWidth;
+                shipShotReady = true;
+            }
+       }
     }
 }
 
@@ -124,23 +132,55 @@ void MoveAliens(void)
         if (aliens[i].y > screenHeight)
         {
             aliens[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
-            aliens[i].y = 0 - alienText.height;
+            aliens[i].y = -aliens[i].height;;
+            continue;
         }
+       if (CheckCollisionRecs(aliens[i], shipShot))
+       {
+            aliens[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
+            aliens[i].y = -aliens[i].height;;
+            if (!shipShotReady)
+            {
+                // Hide sprite and get it available for shooting again.
+                shipShot.x = shipShot.y = screenWidth;
+                shipShotReady = true;
+            }
+       }
     }
 }
 
+void ShipShoot(void)
+{
+    if (shipShotReady)
+    {
+        shipShot.x = ship.x + (int)ship.width/2 - FACTOR;
+        shipShot.y = ship.y - shipShot.height - 1;
+        shipShotReady = false;
+    }
+}
 
-//----------------------------------------------------------------------------------
+void UpdateShipShoot(void)
+{
+    if (!shipShotReady)
+    {
+        // Advance shot.
+        shipShot.y -= (2*FACTOR);
+        shipShotReady = shipShot.y + shipShot.height < 0? true: false;
+    }
+}
+
+//-----------------------------------------------------------------------------
 // Main entry point
-//----------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 int main(void)
 {
     InitializeElements();
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
+        //---------------------------------------------------------------------
         // Update
-        //----------------------------------------------------------------------------------
+        //---------------------------------------------------------------------
         switch(currentScreen)
         {
             case TITLE:
@@ -148,7 +188,7 @@ int main(void)
                 // TODO: Update TITLE screen variables here!
 
                 // Press enter to change to GAMEPLAY screen
-                if (IsKeyPressed(KEY_ENTER) || IsGestureDetected(GESTURE_TAP))
+                if (IsKeyPressed(KEY_ENTER))
                 {
                     currentScreen = GAMEPLAY;
                 }
@@ -164,6 +204,9 @@ int main(void)
                     ship.x -= FACTOR;
                 if (IsKeyDown(KEY_P) || IsKeyDown(KEY_RIGHT))
                     ship.x += FACTOR;
+                if (IsKeyDown(KEY_SPACE))
+                    ShipShoot();
+                UpdateShipShoot();
             } break;
             case ENDING:
             {
@@ -177,10 +220,9 @@ int main(void)
             } break;
             default: break;
         }
-        //----------------------------------------------------------------------------------
-
+        //---------------------------------------------------------------------
         // Draw
-        //----------------------------------------------------------------------------------
+        //---------------------------------------------------------------------
         BeginDrawing();
 
             ClearBackground(BLACK);
@@ -197,9 +239,18 @@ int main(void)
                 } break;
                 case GAMEPLAY:
                 {
-                    DrawShip();
-                    DrawAsteroids();
-                    DrawAliens();
+                    // Asteroids.
+                    for (int i=0; i<ASTER_NUM; ++i)
+                        DrawTextureRec(sprites, asteroidTex, (Vector2) {asteroids[i].x, asteroids[i].y}, WHITE);
+
+                    // Aliens.
+                    for (int i=0; i<ALIEN_NUM; ++i)
+                        DrawTextureRec(sprites, alienTex, (Vector2) {aliens[i].x, aliens[i].y}, WHITE);
+
+                    // Ship.
+                    DrawTextureRec(sprites, shipTex, (Vector2) {ship.x, ship.y}, WHITE);
+                    // Ship Shot.
+                    DrawTextureRec(sprites, sshotTex, (Vector2) {shipShot.x, shipShot.y}, WHITE);
                 } break;
                 case ENDING:
                 {
@@ -213,16 +264,17 @@ int main(void)
             }
 
         EndDrawing();
-        //----------------------------------------------------------------------------------
+        //---------------------------------------------------------------------
     }
 
+    //-------------------------------------------------------------------------
     // De-Initialization
-    //--------------------------------------------------------------------------------------
+    //-------------------------------------------------------------------------
 
     // TODO: Unload all loaded data (textures, fonts, audio) here!
 
     CloseWindow();        // Close window and OpenGL context
-    //--------------------------------------------------------------------------------------
+    //-------------------------------------------------------------------------
 
     return 0;
 }
