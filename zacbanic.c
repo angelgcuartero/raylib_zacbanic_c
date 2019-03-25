@@ -14,12 +14,23 @@
 
 // User-defined types.
 typedef enum GameScreen { TITLE=0, GAMEPLAY, DEATH, ENDING } GameScreen;
-// typedef enum Direction { UP = 0, DOWN } Direction;
+typedef struct
+{
+    Rectangle ship;
+    Rectangle shipShot;
+    bool shipShotReady;
+} ship_t;
+
+typedef struct
+{
+    Rectangle alien;
+    Rectangle alienShot;
+    bool alienShotReady;
+    int shotDir;
+} alien_t;
 
 // Global variables.
-Rectangle ship;
-Rectangle shipShot;
-bool shipShotReady;
+ship_t starShip;
 
 int lives = 2;
 int score = 0;
@@ -35,8 +46,7 @@ Texture2D sprites;  // Contains all the sprites.
 Font font;
 
 Rectangle asteroids[ASTER_NUM];
-Rectangle aliens[ALIEN_NUM];
-Rectangle alienShot[ALIEN_NUM];
+alien_t aliens[ALIEN_NUM];
 
 // Locate individual textures.
 Rectangle shipTex = {0, 0, 14*FACTOR, 16*FACTOR};
@@ -53,13 +63,13 @@ int screenHeight = 192*FACTOR;
 // Prototypes
 // ----------
 void InitializeElements(void);
+void InitShip(void);
+void InitAdversaries(void);
 void MoveAsteroids(void);
 void MoveAliens(void);
 void ShipShoot(void);
 void UpdateShipShoot(void);
-void InitShip(void);
-void InitAdversaries(void);
-
+void AlienShoot(alien_t *alien);
 
 // Initialize window and primary game elements.
 // --------------------------------------------
@@ -89,21 +99,21 @@ void InitializeElements(void)
 void InitShip(void)
 {
    // Init ship and shot.
-    ship = (Rectangle) {
+    starShip.ship = (Rectangle) {
         screenWidth/2 - shipTex.width/2,
         screenHeight - shipTex.height - 16*FACTOR,
         shipTex.width,
         shipTex.height
     };
 
-    shipShot = (Rectangle) {
+    starShip.shipShot = (Rectangle) {
         screenWidth,
         screenHeight,
         sshotTex.width,
         sshotTex.height
     };
 
-    shipShotReady = true;
+    starShip.shipShotReady = true;
 }
 
 void InitAdversaries(void)
@@ -119,12 +129,18 @@ void InitAdversaries(void)
 
     // Initialize aliens' positions.
     for (int i=0; i<ALIEN_NUM; ++i)
-        aliens[i] = (Rectangle) {
+    {
+        aliens[i].alien = (Rectangle) {
             GetRandomValue(0, (int)screenWidth>>4)<<4,
             GetRandomValue(0, screenHeight/3),
             alienTex.width,
             alienTex.height
         };
+        aliens[i].alienShotReady = true;
+        aliens[i].shotDir = 0;
+        aliens[i].alienShot.x = screenWidth;
+        aliens[i].alienShot.y = screenHeight;
+    }
 }
 
 void MoveAsteroids(void)
@@ -139,25 +155,24 @@ void MoveAsteroids(void)
             continue;
         }
 
-       if (CheckCollisionRecs(asteroids[i], shipShot))
+       if (CheckCollisionRecs(asteroids[i], starShip.shipShot))
        {
             asteroids[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
             asteroids[i].y = -asteroids[i].height;
-            if (!shipShotReady)
+            if (!starShip.shipShotReady)
             {
                 // Hide sprite and get it available for shooting again.
-                shipShot.x = shipShot.y = screenWidth;
-                shipShotReady = true;
+                starShip.shipShot.x = starShip.shipShot.y = screenWidth;
+                starShip.shipShotReady = true;
             }
        }
 
-       if (CheckCollisionRecs(asteroids[i], ship))
+       if (CheckCollisionRecs(asteroids[i], starShip.ship))
        {
             --lives;
             currentScreen = DEATH;
-            ship.x = screenWidth/2 - shipTex.width/2;
-            asteroids[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
-            asteroids[i].y = -asteroids[i].height;
+            starShip.ship.x = screenWidth/2 - shipTex.width/2;
+            InitAdversaries();
             if (lives < 0)
             {
                 currentScreen = ENDING;
@@ -172,38 +187,43 @@ void MoveAliens(void)
 {
     for (int i=0; i<ALIEN_NUM; ++i)
     {
-        aliens[i].y += FACTOR*1.1;
-        if (aliens[i].y > screenHeight)
+        // Move aliens.
+        aliens[i].alien.y += FACTOR*1.1;
+        if (aliens[i].alien.y > screenHeight)
         {
-            aliens[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
-            aliens[i].y = -aliens[i].height;;
+            aliens[i].alien.x = GetRandomValue(0, (int)screenWidth>>4)<<4;
+            aliens[i].alien.y = -aliens[i].alien.height;
             continue;
         }
-        if (CheckCollisionRecs(aliens[i], shipShot))
+
+        AlienShoot(&aliens[i]);
+
+        // Alien shot by ship?
+        if (CheckCollisionRecs(aliens[i].alien, starShip.shipShot))
         {
-            aliens[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
-            aliens[i].y = -aliens[i].height;;
-            if (!shipShotReady)
+            aliens[i].alien.x = GetRandomValue(0, (int)screenWidth>>4)<<4;
+            aliens[i].alien.y = -aliens[i].alien.height;
+            if (!starShip.shipShotReady)
             {
                 // Hide sprite and get it available for shooting again.
-                shipShot.x = shipShot.y = screenWidth;
-                shipShotReady = true;
+                starShip.shipShot.x = starShip.shipShot.y = screenWidth;
+                starShip.shipShotReady = true;
                 score += 100;
                 if (score > highScore)
                     highScore = score;
             }
         }
 
-        if (CheckCollisionRecs(aliens[i], ship))
+        // Alien crashed into ship?
+        if (CheckCollisionRecs(aliens[i].alien, starShip.ship))
         {
             score += 100;
             if (score > highScore)
                 highScore = score;
             --lives;
             currentScreen = DEATH;
-            ship.x = screenWidth/2 - shipTex.width/2;
-            aliens[i].x = GetRandomValue(0, (int)screenWidth>>4)<<4;
-            aliens[i].y = -aliens[i].height;
+            starShip.ship.x = screenWidth/2 - shipTex.width/2;
+            InitAdversaries();
             if (lives < 0)
             {
                 currentScreen = ENDING;
@@ -211,27 +231,68 @@ void MoveAliens(void)
                 lives = 2;
             }
         }
+
+        // Ship shot by alien?
+        if (CheckCollisionRecs(aliens[i].alienShot, starShip.ship))
+        {
+            --lives;
+            currentScreen = DEATH;
+            starShip.ship.x = screenWidth/2 - shipTex.width/2;
+            InitAdversaries();
+            if (lives < 0)
+            {
+                currentScreen = ENDING;
+                score = 0;
+                lives = 2;
+            }
+        }
+
     }
 }
 
 void ShipShoot(void)
 {
-    if (shipShotReady)
+    if (starShip.shipShotReady)
     {
-        shipShot.x = ship.x + (int)ship.width/2 - FACTOR;
-        shipShot.y = ship.y - shipShot.height - 1;
-        shipShotReady = false;
+        starShip.shipShot.x = starShip.ship.x + (int)starShip.ship.width/2 - FACTOR;
+        starShip.shipShot.y = starShip.ship.y - starShip.shipShot.height - 1;
+        starShip.shipShotReady = false;
     }
 }
 
 void UpdateShipShoot(void)
 {
-    if (!shipShotReady)
+    if (!starShip.shipShotReady)
     {
-        shipShot.y -= (2*FACTOR);
-        shipShotReady = shipShot.y + shipShot.height < 0? true: false;
+        starShip.shipShot.y -= (2*FACTOR);
+        starShip.shipShotReady = starShip.shipShot.y + starShip.shipShot.height < 0? true: false;
     }
 }
+
+void AlienShoot(alien_t *alien)
+{
+    if (alien->alienShotReady)
+    {
+        // Ready to shoot.
+        if (GetRandomValue(0, 10) > 5)
+        {
+            alien->alienShotReady = false;
+            alien->alienShot.x = alien->alien.x + alien->alien.width/2 - FACTOR;
+            alien->alienShot.y = alien->alien.y + alien->alien.height + FACTOR;
+        }
+    }
+    else
+    {
+        // Move shot.
+        int probable = GetRandomValue(0, 10);
+        alien->shotDir = probable < 3? -2 : probable > 7? 2 : 0;
+        alien->alienShot.x += FACTOR*alien->shotDir;
+        alien->alienShot.y += FACTOR*1.3;
+        alien->alienShotReady = alien->alienShot.y + alien->alienShot.height > screenHeight? true: false;
+    }
+
+}
+
 
 //-----------------------------------------------------------------------------
 // Main entry point
@@ -268,20 +329,21 @@ int main(void)
                 // Check keys.
                 if (IsKeyDown(KEY_O) || IsKeyDown(KEY_LEFT))
                 {
-                    ship.x -= FACTOR;
-                    if (ship.x < 0)
-                        ship.x = 0;
+                    starShip.ship.x -= FACTOR;
+                    if (starShip.ship.x < 0)
+                        starShip.ship.x = 0;
                 }
 
                 if (IsKeyDown(KEY_P) || IsKeyDown(KEY_RIGHT))
                 {
-                    ship.x += FACTOR;
-                    if (ship.x > screenWidth - ship.width)
-                        ship.x = screenWidth - ship.width;
+                    starShip.ship.x += FACTOR;
+                    if (starShip.ship.x > screenWidth - starShip.ship.width)
+                        starShip.ship.x = screenWidth - starShip.ship.width;
                 }
 
                 if (IsKeyDown(KEY_SPACE))
                     ShipShoot();
+
                 UpdateShipShoot();
             } break;
             case DEATH:
@@ -320,13 +382,8 @@ int main(void)
                 case TITLE:
                 {
                     DrawText("ZACBANIC", 3*8*FACTOR, 2*8*FACTOR, 40*FACTOR, MAROON);
-                    // DrawText("Programmed with Raylib by Angel G. Cuartero", 20, 50*FACTOR, 5*FACTOR, GRAY);
                     DrawTextEx(font, "Programmed with Raylib by Angel G. Cuartero", (Vector2){5*8*FACTOR, 7*8*FACTOR}, 6*FACTOR, FACTOR, GRAY);
-                    // DrawText("Player Keys: O, P, Space Bar", 20, 70*FACTOR, 10*FACTOR, GRAY);
                     DrawTextEx(font, "Player Keys: O, P, Space Bar", (Vector2){6*8*FACTOR, 10*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
-                    // DrawText("PRESS ENTER to PLAY", 20, 90*FACTOR, 10*FACTOR, GRAY);
-                    // DrawText("PRESS ESC to QUIT", 20, 100*FACTOR, 10*FACTOR, GRAY);
-
                     DrawTextEx(font, "--> PRESS ENTER TO PLAY", (Vector2){6*8*FACTOR, 12*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
                     DrawTextEx(font, "--> PRESS ESC TO QUIT", (Vector2){6*8*FACTOR, 13*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
 
@@ -338,11 +395,14 @@ int main(void)
                         DrawTextureRec(sprites, asteroidTex, (Vector2) {asteroids[i].x, asteroids[i].y}, WHITE);
                     // Aliens.
                     for (int i=0; i<ALIEN_NUM; ++i)
-                        DrawTextureRec(sprites, alienTex, (Vector2) {aliens[i].x, aliens[i].y}, WHITE);
-                    // Ship.
-                    DrawTextureRec(sprites, shipTex, (Vector2) {ship.x, ship.y}, WHITE);
+                    {
+                        DrawTextureRec(sprites, alienTex, (Vector2) {aliens[i].alien.x, aliens[i].alien.y}, WHITE);
+                        DrawTextureRec(sprites, ashotTex, (Vector2) {aliens[i].alienShot.x, aliens[i].alienShot.y}, WHITE);
+                    }
+                    // starShip.
+                    DrawTextureRec(sprites, shipTex, (Vector2) {starShip.ship.x, starShip.ship.y}, WHITE);
                     // Ship Shot.
-                    DrawTextureRec(sprites, sshotTex, (Vector2) {shipShot.x, shipShot.y}, WHITE);
+                    DrawTextureRec(sprites, sshotTex, (Vector2) {starShip.shipShot.x, starShip.shipShot.y}, WHITE);
                     // Lives.
                     sprintf(strLives, " = %d", lives);
                     sprintf(strScore, "Score: %04d", score);
@@ -354,8 +414,8 @@ int main(void)
                 {
                     sprintf(strScore, "HighScore: %04d", highScore);
                     DrawTextEx(font, strScore, highScorePosition, 9*FACTOR, FACTOR, GRAY);
-                    DrawTextEx(font, "--> PRESS ENTER TO START", (Vector2){6*8*FACTOR, 11*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
-                    DrawTextureRec(sprites, shipTex, (Vector2) {ship.x, ship.y}, WHITE);
+                    DrawTextEx(font, "--> PRESS ENTER TO START", (Vector2){6*8*FACTOR, 12*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
+                    DrawTextureRec(sprites, shipTex, (Vector2) {starShip.ship.x, starShip.ship.y}, WHITE);
 
                 } break;
                 case ENDING:
@@ -363,7 +423,8 @@ int main(void)
                     sprintf(strScore, "HighScore: %04d", highScore);
                     DrawTextEx(font, strScore, highScorePosition, 9*FACTOR, FACTOR, GRAY);
                     DrawTextEx(font, "== GAME OVER ==", (Vector2){9*8*FACTOR, 9*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
-                    DrawTextEx(font, "--> PRESS ENTER TO START", (Vector2){6*8*FACTOR, 11*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
+                    DrawTextEx(font, "--> PRESS ENTER TO START", (Vector2){6*8*FACTOR, 12*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
+                    DrawTextEx(font, "--> PRESS ESC TO QUIT", (Vector2){6*8*FACTOR, 13*8*FACTOR}, 9*FACTOR, FACTOR, GRAY);
                 } break;
                 default: break;
             }
