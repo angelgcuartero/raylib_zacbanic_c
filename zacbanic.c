@@ -11,6 +11,7 @@
 #define FACTOR 4    // Must be 1, 2 or 4.
 #define ASTER_NUM 8
 #define ALIEN_NUM 4
+#define FPS 60
 
 // User-defined types.
 typedef enum GameScreen { TITLE=0, GAMEPLAY, DEATH, ENDING } GameScreen;
@@ -32,11 +33,15 @@ typedef struct
 // Global variables.
 ship_t starShip;
 
+int counter = FPS;
+int seconds = 180;
 int lives = 2;
 int score = 0;
 int highScore = 0;
 char strLives[8];
 char strScore[16];
+char strSeconds[16];
+Vector2 secondsPosition;
 Vector2 scorePosition;
 Vector2 highScorePosition;
 Vector2 livesPosition;
@@ -83,17 +88,19 @@ void InitializeElements(void)
     sprites = LoadTexture(spriteFile);
     font = LoadFont("romulus.png");
 
+    sprintf(strSeconds, "Time: %03d", seconds);
     sprintf(strScore, "Score = %06d", score);
     sprintf(strLives, " = %d", lives);
 
     // scorePosition = (Vector2) {screenWidth - , screenHeight - livesTex.height};
+    secondsPosition = (Vector2) {21*8*FACTOR, 0};
     scorePosition = (Vector2) {4*8*FACTOR, 0};
     highScorePosition = (Vector2) {11*8*FACTOR, 2*8*FACTOR};
     livesSpritePosition = (Vector2) {screenWidth - livesTex.width*4, screenHeight - livesTex.height};
     livesPosition = (Vector2) {screenWidth - livesTex.width*3, screenHeight - livesTex.height};
     InitShip();
     InitAdversaries();
-    SetTargetFPS(60);  // Set desired framerate (frames-per-second)
+    SetTargetFPS(FPS);  // Set desired framerate (frames-per-second)
 }
 
 void InitShip(void)
@@ -322,7 +329,16 @@ int main(void)
             } break;
             case GAMEPLAY:
             {
-                // TODO: Update GAMEPLAY screen variables here!
+                --counter;
+                if (!counter)
+                {
+                    counter = FPS;
+                    --seconds;
+                    if (!seconds)
+                    {
+                        currentScreen = ENDING;
+                    }
+                }
                 MoveAsteroids();
                 MoveAliens();
 
@@ -366,6 +382,8 @@ int main(void)
                     currentScreen = GAMEPLAY;
                     InitAdversaries();
                     InitShip();
+                    counter = FPS;
+                    seconds = 180;
                 }
             } break;
             default: break;
@@ -406,9 +424,11 @@ int main(void)
                     // Lives.
                     sprintf(strLives, " = %d", lives);
                     sprintf(strScore, "Score: %04d", score);
+                    sprintf(strSeconds, "Time: %03d", seconds);
                     DrawTextureRec(sprites, livesTex, livesSpritePosition, WHITE);
                     DrawTextEx(font, strLives, livesPosition, 9*FACTOR, FACTOR, GRAY);
                     DrawTextEx(font, strScore, scorePosition, 9*FACTOR, FACTOR, GRAY);
+                    DrawTextEx(font, strSeconds, secondsPosition, 9*FACTOR, FACTOR, GRAY);
                 } break;
                 case DEATH:
                 {
