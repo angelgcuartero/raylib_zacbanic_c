@@ -12,6 +12,7 @@
 #define ASTER_NUM 8
 #define ALIEN_NUM 4
 #define FPS 60
+#define TIMEUP 180
 
 // User-defined types.
 typedef enum GameScreen { TITLE=0, GAMEPLAY, DEATH, ENDING } GameScreen;
@@ -34,7 +35,7 @@ typedef struct
 ship_t starShip;
 
 int counter = FPS;
-int seconds = 180;
+int seconds = TIMEUP;
 int lives = 2;
 int score = 0;
 int highScore = 0;
@@ -383,7 +384,7 @@ int main(void)
                     InitAdversaries();
                     InitShip();
                     counter = FPS;
-                    seconds = 180;
+                    seconds = TIMEUP;
                 }
             } break;
             default: break;
